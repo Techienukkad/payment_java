@@ -1,11 +1,7 @@
 package com.interswitch.techquest.payment.gateway.sample;
 
-import com.interswitch.techquest.secure.utils.InterswitchAuth;
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import com.interswitch.techquest.auth.Interswitch;
+import com.interswitch.techquest.auth.helpers.RequestHeaders;
 import java.util.HashMap;
 import java.util.UUID;
 import org.json.JSONObject;
@@ -16,121 +12,111 @@ import org.json.JSONObject;
  */
 public class PaymentGateway {
 
-    private static String generateRef() {
+    private Interswitch interswitchBase;
+
+    public PaymentGateway(String clientId, String clientSecret) {
+        this(clientId, clientSecret, Interswitch.ENV_SANDBOX);
+    }
+
+    public PaymentGateway(String clientId, String clientSecret, String env) {
+
+        if (clientId == null) {
+            throw new IllegalArgumentException("CliendId is empty");
+        }
+        if (clientSecret == null) {
+            throw new IllegalArgumentException("CliendSecret is empty");
+        }
+
+        if (env == null) {
+            env = Interswitch.SANDBOX_BASE_URL;
+        }
+
+        interswitchBase = new Interswitch(clientId, clientSecret, env);
+    }
+
+    static String authData = "";
+
+    public HashMap<String, String> doPurchase(String pan, String pin, String cvv2, String expiryDate, String amount) throws Exception {
+        HashMap<String, String> interswitchResponse;
+
+        authData = interswitchBase.getAuthData(Constants.CERTIFICATE_FILE_PATH, pan, expiryDate, cvv2, pin);
+
+        String customerId = "paymenttestdriver@interswitchgroup.com";
+        String currency = "NGN";
+
+        JSONObject json = new JSONObject();
+        json.put("customerId", customerId);
+        json.put("amount", amount);
+        json.put("currency", currency);
+        json.put("transactionRef", generateRef());
+        json.put("authData", authData);
+        String jsonData = json.toString();
+
+        String signatureParameters = amount + "&" + authData;
+
+        interswitchResponse = interswitchBase.send(Constants.PURCHASE_URL, Constants.POST, jsonData, signatureParameters);
+        return interswitchResponse;
+    }
+
+    public HashMap<String, String> doPurchaseOTP(String paymentId, String authData, String otp) throws Exception {
+        HashMap<String, String> interswitchResponse;
+
+        JSONObject json = new JSONObject();
+        json.put("paymentId", paymentId);
+        json.put("authData", authData);
+        json.put("otp", otp);
+        String jsonData = json.toString();
+
+        String signatureParameters = otp + "&" + authData;
+
+        interswitchResponse = interswitchBase.send(Constants.PURCHASE_OTP_URL, Constants.POST, jsonData, signatureParameters);
+        return interswitchResponse;
+    }
+
+    public HashMap<String, String> doValidation(String pan, String pin, String cvv2, String expiryDate) throws Exception {
+        HashMap<String, String> interswitchResponse;
+
+        authData = interswitchBase.getAuthData(Constants.CERTIFICATE_FILE_PATH, pan, expiryDate, cvv2, pin);
+
+        JSONObject json = new JSONObject();
+        json.put("transactionRef", generateRef());
+        json.put("authData", authData);
+        String jsonData = json.toString();
+
+        interswitchResponse = interswitchBase.send(Constants.VALIDATION_URL, Constants.POST, jsonData);
+        return interswitchResponse;
+    }
+
+    public HashMap<String, String> doValidationOTP(String transRef, String authData, String otp) throws Exception {
+        HashMap<String, String> interswitchResponse;
+
+        JSONObject json = new JSONObject();
+        json.put("transactionRef", transRef);
+        json.put("authData", authData);
+        json.put("otp", otp);
+        String jsonData = json.toString();
+
+        interswitchResponse = interswitchBase.send(Constants.VALIDATION_OTP_URL, Constants.POST, jsonData);
+        return interswitchResponse;
+    }
+
+    public HashMap<String, String> doTransactionQuery(String amount, String transactionRef) throws Exception {
+        HashMap<String, String> interswitchResponse;
+        HashMap<String, String> extraHeaders = new HashMap<String, String>();
+        extraHeaders.put("amount", amount);
+        extraHeaders.put("transactionRef", transactionRef);
+
+        interswitchResponse = interswitchBase.send(Constants.PURCHASE_URL, Constants.GET, null, extraHeaders);
+        return interswitchResponse;
+    }
+
+    public String getAuthData() {
+        return authData;
+    }
+
+    public static String generateRef() {
         UUID nonce = UUID.randomUUID();
-        String transRef = "ISW|API|JAM|" + nonce.toString().replaceAll("-", "");
-        return transRef;
+        return "TEST|DRIVER|" + nonce.toString().replaceAll("-", "");
     }
 
-    private static HashMap<String, String> doREST(String clientAccessToken, String resourceUrl, String httpMethod, String request) throws Exception {
-        HashMap<String, String> response = new HashMap<String, String>();
-        HashMap<String, String> securityHeaders = InterswitchAuth.getBearerSecurityHeaders(Constants.CLIENT_ID, Constants.CLIENT_SECRET, clientAccessToken, resourceUrl, httpMethod, null);
-
-        URL obj = new URL(resourceUrl);
-        HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-        con.setRequestMethod(httpMethod);
-        con.setRequestProperty("Content-Type", "application/json");
-        con.setRequestProperty("Authorization", securityHeaders.get("AUTHORIZATION"));
-        con.setRequestProperty("Timestamp", securityHeaders.get("TIMESTAMP"));
-        con.setRequestProperty("Nonce", securityHeaders.get("NONCE"));
-        con.setRequestProperty("SignatureMethod", securityHeaders.get("SIGNATURE_METHOD"));
-        con.setRequestProperty("Signature", securityHeaders.get("SIGNATURE"));
-
-        if (request != null) {
-            con.setDoOutput(true);
-            DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-            wr.writeBytes(request);
-            wr.flush();
-            wr.close();
-        }
-
-        int responseCode = con.getResponseCode();
-        System.out.println("\nSending " + httpMethod + " request to URL : " + resourceUrl);
-        System.out.println("Post parameters : " + request);
-        System.out.println("Response Code : " + responseCode);
-        BufferedReader in = null;
-        try {
-            in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-        } catch (Exception ex) {
-//            ex.printStackTrace();
-            in = new BufferedReader(new InputStreamReader(con.getErrorStream()));
-//            throw ex;
-        }
-
-        String inputLine;
-        StringBuffer responseBuffer = new StringBuffer();
-        while ((inputLine = in.readLine()) != null) {
-            responseBuffer.append(inputLine);
-        }
-        in.close();
-        JSONObject jSONObjectx = new JSONObject(responseBuffer.toString());
-        System.out.println(jSONObjectx.toString(2));
-
-        response.put(Constants.HTTP_CODE, String.valueOf(responseCode));
-        response.put(Constants.RESPONSE_BODY, responseBuffer.toString());
-
-        return response;
-    }
-
-    public static HashMap<String, String> doValidation(String clientAccessToken, String authData) throws Exception {
-        String httpMethod = "POST";
-        String transactionRef = generateRef(); // unique id to identify each request
-
-        JSONObject jSONObject = new JSONObject();
-        jSONObject.put("authData", authData);
-        jSONObject.put("transactionRef", transactionRef);
-
-        String request = jSONObject.toString();
-
-        return doREST(clientAccessToken, Constants.VALIDATION_RESOURCE_URL, httpMethod, request);
-    }
-
-    public static HashMap<String, String> doValidationAuthOTP(String clientAccessToken, String otp, String transactionRef) throws Exception {
-        String httpMethod = "POST";
-
-        JSONObject jSONObject = new JSONObject();
-        jSONObject.put("otp", otp);
-        jSONObject.put("transactionRef", transactionRef);
-
-        String request = jSONObject.toString();
-
-        return doREST(clientAccessToken, Constants.VALIDATION_AUTH_OTP_RESOURCE_URL, httpMethod, request);
-    }
-
-    public static HashMap<String, String> doPurchase(String clientAccessToken, String authData, String amount) throws Exception {
-        String httpMethod = "POST";
-        String transactionRef = generateRef();
-        String customerId = "api-jam@interswitchgroup.com";
-        String currency = "NGN"; // Currency in 3 letter ISO alphabetic code
-
-        JSONObject jSONObject = new JSONObject();
-        jSONObject.put("customerId", customerId);
-        jSONObject.put("amount", amount);
-        jSONObject.put("currency", currency);
-        jSONObject.put("authData", authData);
-        jSONObject.put("transactionRef", transactionRef);
-
-        String request = jSONObject.toString();
-
-        return doREST(clientAccessToken, Constants.PURCHASE_RESOURCE_URL, httpMethod, request);
-    }
-
-    public static HashMap<String, String> doPurchaseAuthOTP(String clientAccessToken, String otp, String paymentId) throws Exception {
-        String httpMethod = "POST";
-
-        JSONObject jSONObject = new JSONObject();
-        jSONObject.put("otp", otp);
-        jSONObject.put("paymentId", paymentId);
-
-        String request = jSONObject.toString();
-
-        return doREST(clientAccessToken, Constants.PURCHASE_AUTH_OTP_RESOURCE_URL, httpMethod, request);
-    }
-
-    public static HashMap<String, String> doTransactionQuery(String clientAccessToken, String amount, String transactionRef) throws Exception {
-        String httpMethod = "GET";
-        String transactionQueryUrl = Constants.PURCHASE_RESOURCE_URL + "?amount=" + amount + "&transactionRef=" + transactionRef;
-
-        return doREST(clientAccessToken, transactionQueryUrl, httpMethod, null);
-    }
 }
