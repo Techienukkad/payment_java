@@ -3,11 +3,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.interswitch.techquest</groupId>
-    <artifactId>payment-gateway-java</artifactId>
+    <artifactId>payment_java</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>payment-gateway-java</name>
+    <name>payment_java</name>
     <url>http://maven.apache.org</url>
 
     <properties>
@@ -42,9 +42,9 @@
             <version>2.6.3</version>
         </dependency>
         <dependency>
-            <groupId>com.interswitch.techquest</groupId>
-            <artifactId>interswitch-secure-utils</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>com.interswitch</groupId>
+            <artifactId>interswitch-java</artifactId>
+            <version>0.0.1</version>
         </dependency>
     </dependencies>
   

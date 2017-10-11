@@ -6,127 +6,130 @@ import java.util.Scanner;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.interswitch.techquest.secure.utils.InterswitchAuth;
-import com.interswitch.techquest.secure.utils.Passport;
-import com.interswitch.techquest.secure.utils.TransactionSecurity;
+import com.interswitch.techquest.auth.Interswitch;
 
 public class TestDriver {
 
     public static final String HTTP_CODE = "HTTP_CODE";
     public static final String RESPONSE_BODY = "RESPONSE_BODY";
 
-    public static void main(String... args) {
+    public static void main(String[] args) throws Exception {
         try {
-
             System.out.println("To leave a field empty, please press enter");
             Scanner scanner = new Scanner(System.in);
             String quitFlag = "";
 
-            while (quitFlag != null && !quitFlag.equalsIgnoreCase("q")) {
+            PaymentGateway paymentGateway = new PaymentGateway(Constants.CLIENT_ID, Constants.CLIENT_SECRET, Interswitch.ENV_SANDBOX);
+
+            while ((quitFlag != null) && (!quitFlag.equalsIgnoreCase("q"))) {
                 System.out.println("");
                 System.out.println("===================================");
-                System.out.println("1.Validations 2.Purchases 3.Status");
+                System.out.println("1. Validations");
+                System.out.println("2. Purchases");
+                System.out.println("3. Requery");
                 String menuItem = "1";
                 scanner = new Scanner(System.in);
                 menuItem = scanner.nextLine();
 
-                String clientAccessToken = Passport.getClientAccessToken(Constants.CLIENT_ID, Constants.CLIENT_SECRET, Constants.PASSPORT_RESOURCE_URL);
+                HashMap<String, String> interswitchResponse = new HashMap<String, String>();
+                Map<String, String> map = new HashMap();
+                TypeReference<Map<String, String>> typeRef = new TypeReference<Map<String, String>>() {
+                };
+                ObjectMapper mapper = new ObjectMapper();
+                String responseCode, paymentId, transactionRef, httpResponseCode, response;
 
                 if ("3".equals(menuItem)) {
-                    System.out.println("");
-                    System.out.println("===================================");
-                    System.out.println("Amount: ");
-                    String amount = scanner.nextLine();
-                    System.out.println("TransactionRef : ");
-                    String transactionRef = scanner.nextLine();
+                    System.out.println("==========================REQUERY==========================");
+                    System.out.println("Enter amount in major denomination e.g. 100.00");
+                    String amount = "2000.00";
+                    amount = scanner.nextLine();
+                    System.out.println("Enter transactionRef");
+                    transactionRef = scanner.nextLine();
+                    interswitchResponse = paymentGateway.doTransactionQuery(amount, transactionRef);
+                    httpResponseCode = interswitchResponse.get(Interswitch.RESPONSE_CODE);
+                    response = interswitchResponse.get(Interswitch.RESPONSE_MESSAGE);
 
-                    PaymentGateway.doTransactionQuery(clientAccessToken, amount, transactionRef);
+                    System.out.println("HTTP Code: " + httpResponseCode);
+                    System.out.println("Response: " + response);
                 }
 
                 System.out.println("");
                 System.out.println("===================================");
                 System.out.println("Enter your PAN: ");
-                String pan = scanner.nextLine();
-
+                String pan = "5060990580000217499";
+                pan = scanner.nextLine();
                 System.out.println("Enter PAN Expiry Date (Format YYMM e.g. 5004 for Apr, 2050): ");
-                String expiryDate = scanner.nextLine();
-
+                String expiryDate = "2004";
+                expiryDate = scanner.nextLine();
                 System.out.println("Enter CVV. Press enter to ignore: ");
-                String cvv = scanner.nextLine();
-
+                String cvv = "111";
+                cvv = scanner.nextLine();
                 System.out.println("Enter PIN. Press enter to ignore: ");
-                String pin = scanner.nextLine();
-
-                String authData = TransactionSecurity.getAuthData("1", pan, pin, expiryDate, cvv, Constants.CERTIFICATE_FILE_PATH);
+                String pin = "1111";
+                pin = scanner.nextLine();
 
                 if ("1".equals(menuItem)) {
+                    System.out.println("==========================VALIDATIONS==========================");
+                    interswitchResponse = paymentGateway.doValidation(pan, pin, cvv, expiryDate);
+                    httpResponseCode = interswitchResponse.get(Interswitch.RESPONSE_CODE);
+                    response = interswitchResponse.get(Interswitch.RESPONSE_MESSAGE);
 
-                    HashMap<String, String> validateResponse = PaymentGateway.doValidation(clientAccessToken, authData);
+                    System.out.println("HTTP Code: " + httpResponseCode);
+                    System.out.println("Response: " + response);
 
-                    int httpResponseCode = Integer.parseInt(validateResponse.get(HTTP_CODE));
-                    switch (httpResponseCode) {
-                        case 200:
-                            //
-                            break;
-                        case 202:
-                            //
-                            ObjectMapper mapper = new ObjectMapper();
-                            Map<String, Object> responseBody = new HashMap<String, Object>();
-                            responseBody = mapper.readValue(validateResponse.get(RESPONSE_BODY), new TypeReference<Map<String, String>>() {
-                            });
-                            if (responseBody != null && responseBody.containsKey("responseCode")) {
-                                String responseCode = responseBody.get("responseCode").toString();
-                                if (responseCode.equalsIgnoreCase("T0")) {
-                                    System.out.println("Enter your OTP e.g. 958274");
-                                    String otp = scanner.nextLine();
+                    if (httpResponseCode.equalsIgnoreCase("202")) {
+                        map = (Map) mapper.readValue(response, typeRef);
+                        responseCode = (String) map.get("responseCode");
+                        transactionRef = (String) map.get("transactionRef");
+                        System.out.println("Enter your OTP e.g. 958274");
+                        String otp = "958274";
+                        otp = scanner.nextLine();
+                        interswitchResponse = paymentGateway.doValidationOTP(transactionRef, paymentGateway.getAuthData(), otp);
+                        httpResponseCode = interswitchResponse.get(Interswitch.RESPONSE_CODE);
+                        response = interswitchResponse.get(Interswitch.RESPONSE_MESSAGE);
 
-                                    String transactionRef = responseBody.get("transactionRef").toString();
-                                    PaymentGateway.doValidationAuthOTP(clientAccessToken, otp, transactionRef);
-                                }
-                            }
-                            break;
-                        default:
-                            break;
+                        System.out.println("HTTP Code: " + httpResponseCode);
+                        System.out.println("Response: " + response);
                     }
 
-                    System.out.println();
-                    System.out.println("===================================");
-                    System.out.println("Press any key to contiue, Q to quit");
-                    quitFlag = scanner.nextLine();
                 } else if ("2".equals(menuItem)) {
+                    System.out.println("==========================PURCHASES==========================");
                     System.out.println("Enter amount in major denomination e.g. 100.00");
-                    String amount = scanner.nextLine();
+                    String amount = "2000.00";
+                    amount = scanner.nextLine();
+                    interswitchResponse = paymentGateway.doPurchase(pan, pin, cvv, expiryDate, amount);
+                    httpResponseCode = interswitchResponse.get(Interswitch.RESPONSE_CODE);
+                    response = interswitchResponse.get(Interswitch.RESPONSE_MESSAGE);
 
-                    HashMap<String, String> purchaseResponse = PaymentGateway.doPurchase(clientAccessToken, authData, amount);
-                    int httpResponseCode = Integer.parseInt(purchaseResponse.get(HTTP_CODE));
-                    switch (httpResponseCode) {
-                        case 200:
-                            //
-                            break;
-                        case 202:
-                            //
-                            ObjectMapper mapper = new ObjectMapper();
-                            Map<String, Object> responseBody = new HashMap<String, Object>();
-                            responseBody = mapper.readValue(purchaseResponse.get(RESPONSE_BODY), new TypeReference<Map<String, String>>() {
-                            });
-                            if (responseBody != null && responseBody.containsKey("responseCode")) {
-                                String responseCode = responseBody.get("responseCode").toString();
-                                if (responseCode.equalsIgnoreCase("T0")) {
-                                    System.out.println("Enter your OTP e.g. 958274");
-                                    String otp = scanner.nextLine();
+                    System.out.println("HTTP Code: " + httpResponseCode);
+                    System.out.println("Response: " + response);
 
-                                    String paymentId = responseBody.get("paymentId").toString();
-                                    PaymentGateway.doPurchaseAuthOTP(clientAccessToken, otp, paymentId);
-                                }
-                            }
-                            break;
-                        default:
-                            break;
+                    if (httpResponseCode.equalsIgnoreCase("202")) {
+                        map = (Map) mapper.readValue(response, typeRef);
+                        responseCode = (String) map.get("responseCode");
+                        if (responseCode.equalsIgnoreCase("T0")) {
+                            paymentId = (String) map.get("paymentId");
+                            System.out.println("Enter your OTP e.g. 958274");
+                            String otp = "958274";
+                            otp = scanner.nextLine();
+                            interswitchResponse = paymentGateway.doPurchaseOTP(paymentId, paymentGateway.getAuthData(), otp);
+                            httpResponseCode = interswitchResponse.get(Interswitch.RESPONSE_CODE);
+                            response = interswitchResponse.get(Interswitch.RESPONSE_MESSAGE);
+
+                            System.out.println("HTTP Code: " + httpResponseCode);
+                            System.out.println("Response: " + response);
+                        }
                     }
                 }
+
+                System.out.println();
+                System.out.println("===================================");
+                System.out.println("Press any key to contiue, Q to quit");
+                quitFlag = scanner.nextLine();
             }
             scanner.close();
         } catch (Exception ex) {
+            System.out.println("Exception occured: " + ex.getMessage());
             ex.printStackTrace();
         }
     }
