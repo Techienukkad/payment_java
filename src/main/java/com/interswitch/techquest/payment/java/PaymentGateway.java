@@ -1,4 +1,4 @@
-package com.interswitch.techquest.payment.gateway.sample;
+package com.interswitch.techquest.payment.java;
 
 import com.interswitch.techquest.auth.Interswitch;
 import com.interswitch.techquest.auth.helpers.RequestHeaders;
