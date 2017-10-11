@@ -1,4 +1,4 @@
-package com.interswitch.techquest.payment.gateway.sample;
+package com.interswitch.techquest.payment.java.sample;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,6 +7,8 @@ import java.util.Scanner;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interswitch.techquest.auth.Interswitch;
+import com.interswitch.techquest.payment.java.Constants;
+import com.interswitch.techquest.payment.java.PaymentGateway;
 
 public class TestDriver {
 

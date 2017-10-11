@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.interswitch.techquest.payment.gateway.sample;
+package com.interswitch.techquest.payment.java;
 
 /**
  *
@@ -11,8 +11,8 @@ package com.interswitch.techquest.payment.gateway.sample;
  */
 public class Constants {
 
-    final static String CLIENT_ID = "IKIA9614B82064D632E9B6418DF358A6A4AEA84D7218";
-    final static String CLIENT_SECRET = "XCTiBtLy1G9chAnyg0z3BcaFK4cVpwDg/GTw2EmjTZ8=";
+    public final static String CLIENT_ID = "IKIA9614B82064D632E9B6418DF358A6A4AEA84D7218";
+    public final static String CLIENT_SECRET = "XCTiBtLy1G9chAnyg0z3BcaFK4cVpwDg/GTw2EmjTZ8=";
 
     public static final String PURCHASE_URL = "api/v3/purchases";
     public static String PURCHASE_OTP_URL = "api/v3/purchases/otps/auths";
